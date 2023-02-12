@@ -9,6 +9,7 @@
 <script src="https://unpkg.com/leaflet@1.9.2/dist/leaflet.js"
   integrity="sha256-o9N1jGDZrf5tS+Ft4gbIK7mYMipq9lqpVJ91xHSyKhg="
   crossorigin=""></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 
 <style>
   body {padding: 0; margin: 0}
@@ -18,12 +19,63 @@
 
 <body>
 <div id="map"></div>
+<script src="./data.js"></script>
+<script src="./userdata.js"></script>
+
 <script>
 var map = L.map('map');
 
+// 地理院タイル
 L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-  attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+  attribution: [
+    "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
+    "<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-C23.html' target='_blank'>「国土数値情報（海岸線データ）」</a>を加工して作成"
+  ]
 }).addTo(map);
+
+
+// フェリー
+// $.getJSON("./data/ferry_p.geojson",function(data) {
+//   L.geoJson(data).bindPopup(function(layer){
+//     return layer.feature.properties.ferry_p;
+//   }).addTo(map);
+// });
+
+// // // フェリー
+// $.getJSON("./data/ferry_l.geojson",function(data) {
+//   L.geoJson(data).bindPopup(function(layer){
+//     return layer.feature.properties.ferry_l;
+//   }).addTo(map);
+// });
+
+  function getColor(d) {
+    return userdata.visited.includes(d) ? '#FF0000' :
+           userdata.passed.includes(d)  ? '#0000FF' :
+                                          '#000000';
+  }
+
+  function style(feature) {
+    return {
+        color: getColor(feature.properties.id),
+        fillColor: getColor(feature.properties.id),
+        fillOpacity: 0.3,
+        weight: 6,
+        opacity: 1,
+    };
+  }
+  
+  function onEachFeature(feature, layer) {
+    if(feature.properties && feature.properties.popupContent){
+      layer.bindPopup(feature.properties.popupContent);
+    }
+  }
+
+  L.geoJSON(islandPolygons, 
+    {
+      style: style,
+      onEachFeature: onEachFeature
+    }
+  ).addTo(map);
 
 map.setView([35.3622222, 138.7313889], 5);
 </script>
