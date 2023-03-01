@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>GSI Tiles on Leaflet</title>
+<title>日本島マップ</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.2/dist/leaflet.css"
   integrity="sha256-sA+zWATbFveLLNqWO2gtiw3HL/lh1giY/Inf1BJ0z14="
   crossorigin=""/>
@@ -48,10 +48,11 @@ L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
 //   }).addTo(map);
 // });
 
-  function getColor(d) {
-    return userdata.visited.includes(d) ? '#FF0000' :
-           userdata.passed.includes(d)  ? '#0000FF' :
-                                          '#000000';
+  function getColor(id) {
+    return userdata.visited.includes(id)   ? '#FF0000' : // 上陸済み
+           userdata.passed.includes(id)    ? '#0000FF' : // 寄港済み
+           userdata.unreached.includes(id) ? '#000000' : // 未到達
+                                             '#00FF00' ; // 情報なし
   }
 
   function style(feature) {
@@ -59,14 +60,19 @@ L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
         color: getColor(feature.properties.id),
         fillColor: getColor(feature.properties.id),
         fillOpacity: 0.3,
-        weight: 6,
+        weight: 5,
         opacity: 1,
     };
   }
   
   function onEachFeature(feature, layer) {
-    if(feature.properties && feature.properties.popupContent){
-      layer.bindPopup(feature.properties.popupContent);
+    if(feature.properties && feature.properties.islandName){
+      var popupText = "<p>" + feature.properties.islandName + "</p>"
+      var popupText2= "<table>"
+              + "<tr><td>島名：</td><td>" + feature.properties.islandName + "</td></tr>"
+              + "<tr><td>所属：</td><td>" + feature.properties.prefectures + " " + feature.properties.cities + "</td></tr>"
+              + "</table>"
+      layer.bindPopup(popupText2);
     }
   }
 
