@@ -93,9 +93,7 @@ const legend = L.control({position: 'bottomright'});
 legend.onAdd = function (map) {
 
   const div = L.DomUtil.create('div', 'info legend');
-  const grades = [0, 10, 20, 50, 100, 200, 500, 1000];
   const labels = [];
-  let from, to;
 
   labels.push(`<i style="background:#FF0000"></i> 上陸済み`);
   labels.push(`<i style="background:#0000FF"></i> 寄港済み`);
