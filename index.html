@@ -27,13 +27,107 @@
 <script>
 var map = L.map('map');
 
-// 地理院タイル
-L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
-  attribution: [
-    "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>",
-    "<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-C23.html' target='_blank'>「国土数値情報（海岸線データ）」</a>を加工して作成"
-  ]
-}).addTo(map);
+// タイル選択
+var gsiAttribution = [
+  "© <a href='https://maps.gsi.go.jp/development/ichiran.html'>国土地理院</a>"
+]
+var nlftpAttribution = [
+  "<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-C23.html' target='_blank'>「国土数値情報（海岸線データ）」</a>、<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-W09-v2_2.html' target='_blank'>「国土数値情報（湖沼データ）」</a>を加工して作成"
+]
+
+var gsiPaleLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',{
+    minZoom: 2,
+    maxZoom: 18,
+    attribution: gsiAttribution,
+});
+var gsiStdLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
+    minZoom: 2,
+    maxZoom: 18,
+    attribution: gsiAttribution,
+});
+var gsiBlankLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/blank/{z}/{x}/{y}.png',{
+    minZoom: 5,
+    maxZoom: 18,
+    attribution: gsiAttribution,
+});
+var gsiOrtLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',{
+    minZoom: 2,
+    maxZoom: 18,
+    opacity: 0.7,
+    attribution: gsiAttribution
+                        + ",「データソース：Landsat8画像（GSI,TSIC,GEO Grid/AIST）, Landsat8画像（courtesy of the U.S. Geological Survey）, 海底地形（GEBCO）」"
+                        + ",「Images on 世界衛星モザイク画像 obtained from site https://lpdaac.usgs.gov/data_access maintained by the NASA Land Processes Distributed Active Archive Center (LP DAAC), USGS/Earth Resources Observation and Science (EROS) Center, Sioux Falls, South Dakota, (Year). Source of image data product.」",
+});
+var baseMap = {
+	"地理院 淡色地図": gsiPaleLayer.addTo(map),
+	"地理院 標準地図": gsiStdLayer,
+	"地理院 白地図": gsiBlankLayer,
+	"地理院 オルソ": gsiOrtLayer,
+};
+
+// デフォルトのマップ表示
+map.setView([35.3622222, 138.7313889], 5);
+
+// 凡例の表示
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = function (map) {
+  const div = L.DomUtil.create('div', 'info legend');
+  const labels = [];
+
+  labels.push(`<i style="background:#FF0000"></i> 上陸済み`);
+  labels.push(`<i style="background:#0000FF"></i> 寄港・通過済み`);
+  labels.push(`<i style="background:#000000"></i> 未到達`);
+
+  div.innerHTML = labels.join('<br>');
+  return div;
+};
+legend.addTo(map);
+
+// カラー選択
+function getColor(id) {
+  return userdata.visited.includes(id)   ? '#FF0000' : // 上陸済み
+          userdata.passed.includes(id)    ? '#0000FF' : // 寄港済み
+          userdata.unreached.includes(id) ? '#000000' : // 未到達
+                                            '#00FF00' ; // 情報なし
+}
+
+// スタイル設定
+function style(feature) {
+  return {
+      color: getColor(feature.properties.id),
+      fillColor: getColor(feature.properties.id),
+      fillOpacity: 0.3,
+      weight: 5,
+      opacity: 1,
+  };
+}
+
+// ポリゴン選択時のポップアップ
+function onEachFeature(feature, layer) {
+  if(feature.properties && feature.properties.islandName){
+    var popupText = "<p>" + feature.properties.islandName + "</p>"
+    var popupText2= "<table>"
+            + "<tr><td>ＩＤ：</td><td>" + feature.properties.id + "</td></tr>"
+            + "<tr><td>島名：</td><td>" + feature.properties.islandName + "</td></tr>"
+            + "<tr><td>所属：</td><td>" + feature.properties.prefectures + " " + feature.properties.cities + "</td></tr>"
+            + "</table>"
+    layer.bindPopup(popupText2);
+  }
+}
+
+// 島データgeoJSONの追加
+var geojsonLayer = L.geoJSON(islandPolygons, 
+  {
+    style: style,
+    onEachFeature: onEachFeature,
+    attribution: nlftpAttribution
+  }
+).addTo(map);
+
+// レイヤーコントロールを追加
+var layerControl = L.control.layers(baseMap);
+layerControl.addTo(map);
+layerControl.addOverlay(geojsonLayer, "島");
 
 
 // フェリー
@@ -49,61 +143,6 @@ L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
 //     return layer.feature.properties.ferry_l;
 //   }).addTo(map);
 // });
-
-  function getColor(id) {
-    return userdata.visited.includes(id)   ? '#FF0000' : // 上陸済み
-           userdata.passed.includes(id)    ? '#0000FF' : // 寄港済み
-           userdata.unreached.includes(id) ? '#000000' : // 未到達
-                                             '#00FF00' ; // 情報なし
-  }
-
-  function style(feature) {
-    return {
-        color: getColor(feature.properties.id),
-        fillColor: getColor(feature.properties.id),
-        fillOpacity: 0.3,
-        weight: 5,
-        opacity: 1,
-    };
-  }
-  
-  function onEachFeature(feature, layer) {
-    if(feature.properties && feature.properties.islandName){
-      var popupText = "<p>" + feature.properties.islandName + "</p>"
-      var popupText2= "<table>"
-              + "<tr><td>島名：</td><td>" + feature.properties.islandName + "</td></tr>"
-              + "<tr><td>所属：</td><td>" + feature.properties.prefectures + " " + feature.properties.cities + "</td></tr>"
-              + "</table>"
-      layer.bindPopup(popupText2);
-    }
-  }
-
-  L.geoJSON(islandPolygons, 
-    {
-      style: style,
-      onEachFeature: onEachFeature
-    }
-  ).addTo(map);
-
-map.setView([35.3622222, 138.7313889], 5);
-
-
-const legend = L.control({position: 'bottomright'});
-
-legend.onAdd = function (map) {
-
-  const div = L.DomUtil.create('div', 'info legend');
-  const labels = [];
-
-  labels.push(`<i style="background:#FF0000"></i> 上陸済み`);
-  labels.push(`<i style="background:#0000FF"></i> 寄港・通過済み`);
-  labels.push(`<i style="background:#000000"></i> 未到達`);
-
-  div.innerHTML = labels.join('<br>');
-  return div;
-};
-
-legend.addTo(map);
 
 </script>
 </body>
