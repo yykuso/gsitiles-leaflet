@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>日本島マップ</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.2/dist/leaflet.css"
   integrity="sha256-sA+zWATbFveLLNqWO2gtiw3HL/lh1giY/Inf1BJ0z14="
@@ -9,30 +10,48 @@
 <script src="https://unpkg.com/leaflet@1.9.2/dist/leaflet.js"
   integrity="sha256-o9N1jGDZrf5tS+Ft4gbIK7mYMipq9lqpVJ91xHSyKhg="
   crossorigin=""></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"
+  integrity="sha256-oP6HI9z1XaZNBrJURtCoUT5SUnxFr8s3BzRl+cbzUq8="
+  crossorigin="anonymous"></script>
+<script src="https://kit.fontawesome.com/1c3ba0cb0d.js"
+  crossorigin="anonymous"></script>
 
 <style>
-  body {padding: 0; margin: 0}
-  html, body, #map {height: 100%; width: 100%;}
-  .info {padding: 6px 8px;font: 14px/16px Arial, Helvetica, sans-serif;background: white;background: rgba(255,255,255,0.8);box-shadow: 0 0 15px rgba(0,0,0,0.2);border-radius: 5px;} .info h4 { margin: 0 0 5px; color: #777; }
+  body { margin:0; padding:0; }
+  #map { position:absolute; top:0; bottom:0; right:0; left:0; }
+  html, body, .container { height: 100%; width: 100%; overflow: hidden; }
+  .info {padding: 6px 8px;font: 14px/16px Arial, Helvetica, sans-serif;background: white;background: rgba(255,255,255,0.8);box-shadow: 0 0 15px rgba(0,0,0,0.2);border-radius: 5px;}
+  .info h4 { margin: 0 0 5px; color: #777; }
   .legend { text-align: left; line-height: 18px; color: #555; } .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; }
+  .color_palette { background-color:#333333; color:#333333; border-color:#333333; }
+  .solid_icon { position:absolute; background-color:none; color:none; }
+  .solid_icon > i { position:absolute; top:-0.5em; left:-0.5em; }
 </style>
 </head>
 
 <body>
-<div id="map"></div>
-<script src="./data.js"></script>
-<script src="./userdata.js"></script>
+<div class="container"><div id="map"></div></div>
+<script src="./Data/islandData.js"></script>
+<script src="./Data/portData.js"></script>
+<script src="./Data/seaRouteData.js"></script>
+<script src="./Data/userdata.js"></script>
 
 <script>
 var map = L.map('map');
+var visitedColor = "#FF0000";
+var passedColor = "#0000FF";
+var unreachedColor = "#000000";
+var notFoundColor = "#00FF00";
 
 // タイル選択
 var gsiAttribution = [
   "© <a href='https://maps.gsi.go.jp/development/ichiran.html'>国土地理院</a>"
 ]
-var nlftpAttribution = [
+var nlftpIslandAttribution = [
   "<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-C23.html' target='_blank'>「国土数値情報（海岸線データ）」</a>、<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-W09-v2_2.html' target='_blank'>「国土数値情報（湖沼データ）」</a>を加工して作成"
+]
+var nlftpPortAttribution = [
+  "<a href='https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-C02-v3_2.html' target='_blank'>「国土数値情報（港湾データ）」</a>を加工して作成"
 ]
 
 var gsiPaleLayer = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',{
@@ -74,9 +93,9 @@ legend.onAdd = function (map) {
   const div = L.DomUtil.create('div', 'info legend');
   const labels = [];
 
-  labels.push(`<i style="background:#FF0000"></i> 上陸済み`);
-  labels.push(`<i style="background:#0000FF"></i> 寄港・通過済み`);
-  labels.push(`<i style="background:#000000"></i> 未到達`);
+  labels.push(`<i style="background:` + visitedColor   + `"></i> 上陸済み`);
+  labels.push(`<i style="background:` + passedColor    + `"></i> 寄港・通過済み`);
+  labels.push(`<i style="background:` + unreachedColor + `"></i> 未到達`);
 
   div.innerHTML = labels.join('<br>');
   return div;
@@ -85,64 +104,105 @@ legend.addTo(map);
 
 // カラー選択
 function getColor(id) {
-  return userdata.visited.includes(id)   ? '#FF0000' : // 上陸済み
-          userdata.passed.includes(id)    ? '#0000FF' : // 寄港済み
-          userdata.unreached.includes(id) ? '#000000' : // 未到達
-                                            '#00FF00' ; // 情報なし
+  return userData.visited.includes(id)   ? visitedColor : // 上陸済み
+          userData.passed.includes(id)    ? passedColor : // 寄港済み
+          userData.unreached.includes(id) ? unreachedColor : // 未到達
+                                            notFoundColor ; // 情報なし
 }
 
-// スタイル設定
-function style(feature) {
-  return {
+
+// 島データ
+var islandMap = L.geoJson(islandData, {
+  // ポリゴン表示スタイル
+  style: function(feature){
+    return {
       color: getColor(feature.properties.id),
       fillColor: getColor(feature.properties.id),
       fillOpacity: 0.3,
       weight: 5,
       opacity: 1,
-  };
-}
+    }
+  },
+  // ポップアップ
+  onEachFeature: function (feature, layer) {
+    if(feature.properties && feature.properties.islandName){
+      var popupText = "<p>" + feature.properties.islandName + "</p>"
+      var popupText2= "<table>"
+              + "<tr><td>ＩＤ：</td><td>" + feature.properties.id + "</td></tr>"
+              + "<tr><td>島名：</td><td>" + feature.properties.islandName + "</td></tr>"
+              + "<tr><td>所属：</td><td>" + feature.properties.prefectures + " " + feature.properties.cities + "</td></tr>"
+              + "</table>"
+      layer.bindPopup(popupText2);
+    }
+  },
+  // 引用情報
+  attribution: nlftpIslandAttribution
+}).addTo(map);
 
-// ポリゴン選択時のポップアップ
-function onEachFeature(feature, layer) {
-  if(feature.properties && feature.properties.islandName){
-    var popupText = "<p>" + feature.properties.islandName + "</p>"
-    var popupText2= "<table>"
-            + "<tr><td>ＩＤ：</td><td>" + feature.properties.id + "</td></tr>"
-            + "<tr><td>島名：</td><td>" + feature.properties.islandName + "</td></tr>"
-            + "<tr><td>所属：</td><td>" + feature.properties.prefectures + " " + feature.properties.cities + "</td></tr>"
-            + "</table>"
-    layer.bindPopup(popupText2);
-  }
-}
 
-// 島データgeoJSONの追加
-var geojsonLayer = L.geoJSON(islandPolygons, 
-  {
-    style: style,
-    onEachFeature: onEachFeature,
-    attribution: nlftpAttribution
+// 港湾データ
+var portMap = L.geoJson(portData, {
+  // アイコン表示（FontAwesome）
+  pointToLayer: function (feature, latlng) {
+    return L.marker(latlng, {
+      icon: L.divIcon(
+        {
+          html:'<i class="fa-solid fa-anchor"></i>', 
+          className:'color_palette solid_icon', 
+          iconSize: [0, 0]
+        }
+      ),
+    });
+  },
+  // ポップアップ
+  onEachFeature: function onEachFeature(feature, layer) {
+    if(feature.properties && feature.properties.N09_004) {
+      layer.bindPopup(feature.properties.N09_004);
+    }
+  },
+  // 引用情報
+  attribution: nlftpPortAttribution
+})
+
+
+// 航路データ
+var seaRouteMap = L.geoJson(seaRouteData, {
+  // ラインの表示スタイル
+  style: {
+    color: '#FC9000',
+    weight: 3,
+    opacity: 0.5,
+  },
+  // ポップアップ
+  onEachFeature: function onEachFeature(feature, layer) {
+    if(feature.properties && feature.properties.N09_006) {
+      layer.bindPopup(feature.properties.N09_006);
+    }
   }
-).addTo(map);
+})
+
+
+var geojsonLayer = {
+  "島到達情報": islandMap,
+  "港湾情報": portMap,
+  "航路情報": seaRouteMap,
+}
 
 // レイヤーコントロールを追加
-var layerControl = L.control.layers(baseMap);
-layerControl.addTo(map);
-layerControl.addOverlay(geojsonLayer, "島");
-
-
-// フェリー
-// $.getJSON("./data/ferry_p.geojson",function(data) {
-//   L.geoJson(data).bindPopup(function(layer){
-//     return layer.feature.properties.ferry_p;
-//   }).addTo(map);
-// });
-
-// // // フェリー
-// $.getJSON("./data/ferry_l.geojson",function(data) {
-//   L.geoJson(data).bindPopup(function(layer){
-//     return layer.feature.properties.ferry_l;
-//   }).addTo(map);
-// });
+if (L.Browser.mobile) {
+  L.control.layers(
+    baseMap,
+    geojsonLayer,
+    // モバイルでは折りたたむ
+    { collapsed: true }
+  ).addTo(map);
+} else {
+  L.control.layers(
+    baseMap,
+    geojsonLayer,
+    { collapsed: false }
+  ).addTo(map);
+}
 
 </script>
 </body>
