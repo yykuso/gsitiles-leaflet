@@ -178,7 +178,9 @@ var seaRouteMap = L.geoJson(seaRouteData, {
     if(feature.properties && feature.properties.N09_006) {
       layer.bindPopup(feature.properties.N09_006);
     }
-  }
+  },
+  // 引用情報
+  attribution: nlftpPortAttribution
 })
 
 
